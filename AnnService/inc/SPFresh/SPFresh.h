@@ -573,23 +573,25 @@ namespace SPTAG {
 
             template <typename ValueType>
             void StableSearch(SPANN::Index<ValueType>* p_index,
-                int numThreads,
-                std::shared_ptr<SPTAG::VectorSet> querySet,
-                std::shared_ptr<SPTAG::VectorSet> vectorSet,
-                int avgStatsNum,
-                int queryCountLimit,
-                int internalResultNum,
-                std::string& truthFileName,
-                SPANN::Options& p_opts,
-                double second = 0,
-                bool showStatus = true)
+                              int numThreads,
+                              std::shared_ptr<SPTAG::VectorSet> querySet,
+                              std::shared_ptr<SPTAG::VectorSet> vectorSet,
+                              int avgStatsNum,
+                              int queryCountLimit,
+                              int internalResultNum,
+                              std::string& truthFileName,
+                              SPANN::Options& p_opts,
+                              double second = 0,
+                              bool showStatus = true)
             {
                 if (avgStatsNum == 0) return;
                 int numQueries = querySet->Count();
 
                 std::vector<QueryResult> results(numQueries, QueryResult(NULL, internalResultNum, false));
 
-                if (showStatus) LOG(Helper::LogLevel::LL_Info, "Searching: numThread: %d, numQueries: %d, searchTimes: %d.\n", numThreads, numQueries, avgStatsNum);
+                if (showStatus)
+                    LOG(Helper::LogLevel::LL_Info, "Searching: numThread: %d, numQueries: %d, searchTimes: %d.\n",
+                    numThreads, numQueries, avgStatsNum);
                 std::vector<SPANN::SearchStats> stats(numQueries);
                 std::vector<SPANN::SearchStats> TotalStats(numQueries);
                 ResetStats(TotalStats);
