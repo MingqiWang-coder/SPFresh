@@ -16,7 +16,6 @@
 #include <string.h>
 #include <vector>
 #include <set>
-#include <cstdint>
 
 #define PREFETCH
 
@@ -34,18 +33,18 @@ namespace SPTAG
             static inline float atomic_float_add(volatile float* ptr, const float operand)
             {
                 union {
-                    volatile int32_t iOld;
+                    volatile long iOld;
                     float fOld;
                 };
                 union {
-                    int32_t iNew;
+                    long iNew;
                     float fNew;
                 };
 
                 while (true) {
-                    iOld = *(volatile int32_t *)ptr;
+                    iOld = *(volatile long *)ptr;
                     fNew = fOld + operand;
-                    if (InterlockedCompareExchange((int32_t *)ptr, iNew, iOld) == iOld) {
+                    if (InterlockedCompareExchange((long *)ptr, iNew, iOld) == iOld) {
                         return fNew;
                     }
                 }

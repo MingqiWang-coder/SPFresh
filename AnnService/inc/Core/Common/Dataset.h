@@ -238,9 +238,9 @@ namespace SPTAG
             }
             ~Dataset()
             {
-                // if (ownData) ALIGN_FREE(data);
-                // for (char* ptr : *incBlocks) ALIGN_FREE(ptr);
-                // incBlocks->clear();
+                if (ownData) ALIGN_FREE(data);
+                for (char* ptr : *incBlocks) ALIGN_FREE(ptr);
+                incBlocks->clear();
             }
 
             void Initialize(SizeType rows_, DimensionType cols_, SizeType rowsInBlock_, SizeType capacity_, const void* data_ = nullptr, bool shareOwnership_ = true, std::shared_ptr<std::vector<char*>> incBlocks_ = nullptr, int colStart_ = 0, int rowEnd_ = -1)
