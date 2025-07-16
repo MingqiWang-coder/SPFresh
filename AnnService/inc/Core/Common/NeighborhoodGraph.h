@@ -460,6 +460,7 @@ break;
             template <typename T>
             void RefineGraph(VectorIndex* index, const std::unordered_map<SizeType, SizeType>* idmap = nullptr)
             {
+                std::cout << "[DEBUG] Enter RefineGraph" << std::endl;
                 for (int iter = 0; iter < m_iRefineIter - 1; iter++)
                 {
                     auto t1 = std::chrono::high_resolution_clock::now();

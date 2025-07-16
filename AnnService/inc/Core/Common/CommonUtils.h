@@ -33,18 +33,22 @@ namespace SPTAG
             static inline float atomic_float_add(volatile float* ptr, const float operand)
             {
                 union {
-                    volatile long iOld;
+//                    volatile long iOld;
+                    volatile int32_t iOld;
                     float fOld;
                 };
                 union {
-                    long iNew;
+//                    long iNew;
+                    int32_t iNew;
                     float fNew;
                 };
 
                 while (true) {
-                    iOld = *(volatile long *)ptr;
+//                    iOld = *(volatile long *)ptr;
+                    iOld = *(volatile int32_t *)ptr;
                     fNew = fOld + operand;
-                    if (InterlockedCompareExchange((long *)ptr, iNew, iOld) == iOld) {
+//                    if (InterlockedCompareExchange((long *)ptr, iNew, iOld) == iOld) {
+                    if (InterlockedCompareExchange((int32_t *)ptr, iNew, iOld) == iOld) {
                         return fNew;
                     }
                 }
