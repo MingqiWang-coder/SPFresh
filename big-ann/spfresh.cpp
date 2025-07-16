@@ -113,12 +113,12 @@ bool BuildSPANN(std::shared_ptr<SPTAG::VectorSet>& vec, std::shared_ptr<SPTAG::M
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
     std::cout << "Index building completed in " << duration.count() << " seconds" << std::endl;
 
-    std::cout << "Saving index to " << output_path << std::endl;
-    SPTAG::ErrorCode save_result = vecIndex->SaveIndex(output_path);
-    if (SPTAG::ErrorCode::Success != save_result) {
-        std::cerr << "Error: Failed to save index, error code: " << static_cast<int>(save_result) << std::endl;
-        return false;
-    }
+//    std::cout << "Saving index to " << output_path << std::endl;
+//    SPTAG::ErrorCode save_result = vecIndex->SaveIndex(output_path);
+//    if (SPTAG::ErrorCode::Success != save_result) {
+//        std::cerr << "Error: Failed to save index, error code: " << static_cast<int>(save_result) << std::endl;
+//        return false;
+//    }
 
     std::cout << "Index saved successfully!" << std::endl;
     return true;
@@ -202,7 +202,7 @@ int main() {
         }
 
         // 取前50万个数据用于构建索引
-        const uint32_t build_count = std::min(500000u, num_data_vectors);
+        const uint32_t build_count = std::min(100000u, num_data_vectors);
         std::cout << "\nUsing " << build_count << " vectors for index building" << std::endl;
 
         // 创建VectorSet

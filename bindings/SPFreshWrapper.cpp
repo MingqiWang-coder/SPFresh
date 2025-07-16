@@ -44,6 +44,10 @@ void build(py::array_t<ValueType> data, const std::string& index_directory, int 
     auto buf = data.request();
     SizeType num = buf.shape[0];
     DimensionType dim = buf.shape[1];
+	std::cout << "*************************" << std::endl;
+    std::cout << "Building SPFresh index..." << std::endl;
+    std::cout << "Number of vectors: " << num << std::endl;
+    std::cout << "Dimension: " << dim << std::endl;
 
     // 创建向量数据的副本
     std::vector<ValueType> vectors(num * dim);
@@ -89,12 +93,16 @@ void build(py::array_t<ValueType> data, const std::string& index_directory, int 
         throw std::runtime_error("Failed to create SPANN index instance");
     }
 
+    std::cout << "VectorSet: " << (vecset ? "valid" : "nullptr") << std::endl;
+    std::cout << "MetadataSet: " << (metaset ? "valid" : "nullptr") << std::endl;
+    std::cout << "VectorSet count = " << vecset->Count() << ", dimension = " << vecset->Dimension() << std::endl;
+
     // 设置SPANN参数（保持原有参数不变）
     spannIndex->SetParameter("IndexAlgoType", "BKT", "Base");
     spannIndex->SetParameter("DistCalcMethod", "L2", "Base");
-    spannIndex->SetParameter("Dim","128" ,"Base");
+    spannIndex->SetParameter("Dim",std::to_string(dim),"Base");
     spannIndex->SetParameter("ValueType","Float" ,"Base");
-    spannIndex->SetParameter("IndexDirectory", "./data/spfresh_index", "Base");
+    spannIndex->SetParameter("IndexDirectory", index_directory.c_str(), "Base");
 
     // SelectHead 阶段参数
     spannIndex->SetParameter("isExecute", "true", "SelectHead");
@@ -109,37 +117,54 @@ void build(py::array_t<ValueType> data, const std::string& index_directory, int 
     // BuildSSDIndex 阶段参数
     spannIndex->SetParameter("isExecute", "true", "BuildSSDIndex");
     spannIndex->SetParameter("BuildSsdIndex", "true", "BuildSSDIndex");
-    spannIndex->SetParameter("NumberOfThreads", "1", "BuildSSDIndex");
+    spannIndex->SetParameter("NumberOfThreads", std::to_string(ssd_build_threads), "BuildSSDIndex");
     spannIndex->SetParameter("PostingPageLimit", "12", "BuildSSDIndex");
     spannIndex->SetParameter("SearchPostingPageLimit", "12", "BuildSSDIndex");
     spannIndex->SetParameter("InternalResultNum", "64", "BuildSSDIndex");
     spannIndex->SetParameter("SearchInternalResultNum", "64", "BuildSSDIndex");
-    spannIndex->SetParameter("TmpDir", "./data/tmp/", "BuildSSDIndex");
+    std::string full_tmp_dir = index_directory + "/tmp";
+    spannIndex->SetParameter("TmpDir", full_tmp_dir.c_str(), "BuildSSDIndex");
     spannIndex->SetParameter("SearchResult", "result.txt", "BuildSSDIndex");
     spannIndex->SetParameter("SearchInternalResultNum", "32", "BuildSSDIndex");
     spannIndex->SetParameter("SearchPostingPageLimit", "3", "BuildSSDIndex");
     spannIndex->SetParameter("ResultNum", "10", "BuildSSDIndex");
     spannIndex->SetParameter("MaxDistRatio", "8.0", "BuildSSDIndex");
+	spannIndex->SetParameter("UseKV", "true", "BuildSSDIndex");
+    std::string full_KV_dir = index_directory + "/kvpath";
+    spannIndex->SetParameter("KVPath", full_KV_dir.c_str(), "BuildSSDIndex");
+    spannIndex->SetParameter("InPlace", "true", "BuildSSDIndex");
+    spannIndex->SetParameter("Update", "true", "BuildSSDIndex");
+//    spannIndex->SetParameter("SpdkMappingPath",index_directory.c_str() , "BuildSSDIndex");
+//   spannIndex->SetParameter("UseSPDK", "true", "BuildSSDIndex");
+//   spannIndex->SetParameter("SsdInfoFile", index_directory.c_str(), "BuildSSDIndex");
+//   spannIndex->SetParameter("UseDirectIO", "true", "BuildSSDIndex");
+    // 开始构建索引
+    std::cout << "Starting SPANN index construction..." << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
 
-    // 使用正确的BuildIndex方法
     SPTAG::ErrorCode build_result = spannIndex->BuildIndex(vecset, metaset);
     if (SPTAG::ErrorCode::Success != build_result) {
         throw std::runtime_error("Failed to build SPANN index, error code: " + std::to_string(static_cast<int>(build_result)));
     }
 
-    // 保存索引
-    SPTAG::ErrorCode save_result = spannIndex->SaveIndex(index_directory);
-    if (SPTAG::ErrorCode::Success != save_result) {
-        throw std::runtime_error("Failed to save index, error code: " + std::to_string(static_cast<int>(save_result)));
-    }
-    vecIndex = std::dynamic_pointer_cast<SPANN::Index<ValueType>>(spannIndex);
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
+    std::cout << "Index building completed in " << duration.count() << " seconds" << std::endl;
 
-    // 构建完成后保存映射
+    // 转换为SPANN::Index指针以供后续使用
+    vecIndex = std::dynamic_pointer_cast<SPANN::Index<ValueType>>(spannIndex);
+    if (nullptr == vecIndex) {
+        throw std::runtime_error("Failed to cast to SPANN::Index");
+    }
+
+    // 构建完成后初始化映射
     for (SizeType i = 0; i < num; ++i) {
         m_externalToInternal[i] = i;
         m_internalToExternal[i] = i;
     }
     m_nextInternalId = num;
+
+    std::cout << "SPFresh index build completed successfully!" << std::endl;
 }
 
 
@@ -196,53 +221,52 @@ void build(py::array_t<ValueType> data, const std::string& index_directory, int 
                     for (auto& t : threads) t.join();
                 }
 
-                std::vector<std::vector<SizeType>> search(
-                    py::array_t<ValueType> queries, int k, int thread_num)
-                {
-                    auto buf = queries.request();
-                    SizeType num = buf.shape[0];
-                    std::vector<QueryResult> results;
-                    results.reserve(num);
+std::vector<std::vector<SizeType>> search(
+py::array_t<ValueType> queries, int k, int thread_num)
+{
+    auto buf = queries.request();
+    SizeType num = buf.shape[0];
+    std::vector<QueryResult> results;
+    results.reserve(num);
+    std::vector<SPTAG::SPANN::SearchStats> stats(num); // ✅ 添加 stats
 
-                    for (SizeType i = 0; i < num; i++) {
-                        results.emplace_back(
-                            static_cast<ValueType*>(buf.ptr) + i * m_dimension,
-                            k, false);
-                    }
+    for (SizeType i = 0; i < num; i++) {
+        results.emplace_back(static_cast<ValueType*>(buf.ptr) + i * m_dimension, k, false);
+    }
 
-                    std::atomic_size_t queriesSent(0);
-                    std::vector<std::thread> threads;
+    std::atomic_size_t queriesSent(0);
+    std::vector<std::thread> threads;
 
-                    auto search_func = [&]() {
-                        vecIndex->Initialize();
-                        SizeType index = 0;
-                        while ((index = queriesSent.fetch_add(1)) < num) {
-                            vecIndex->GetMemoryIndex()->SearchIndex(results[index]);
-                            vecIndex->SearchDiskIndex(results[index]);
-                        }
-                    };
+    auto search_func = [&]() {
+        vecIndex->Initialize();
+        SizeType index = 0;
+        while ((index = queriesSent.fetch_add(1)) < num) {
+            vecIndex->GetMemoryIndex()->SearchIndex(results[index]);
+            vecIndex->SearchDiskIndex(results[index], &stats[index]); // ✅ 加入 stats
+        }
+    };
 
-                    for (int i = 0; i < thread_num; i++) {
-                        threads.emplace_back(search_func);
-                    }
-                    for (auto& t : threads) t.join();
+    for (int i = 0; i < thread_num; i++) {
+        threads.emplace_back(search_func);
+    }
+    for (auto& t : threads) t.join();
 
-                    std::vector<std::vector<SizeType>> ret;
-                    for (auto& res : results) {
-                        std::vector<SizeType> ids;
-                        for (int j = 0; j < k; j++) {
-                            auto vid = res.GetResult(j)->VID;
-                            if (m_internalToExternal.find(vid) != m_internalToExternal.end()) {
-                                ids.push_back(m_internalToExternal[vid]);
-                            } else {
-                                ids.push_back(-1); // Not found
-                            }
-                        }
-                        ret.push_back(ids);
-                    }
-                    return ret;
-                }
-            };
+    std::vector<std::vector<SizeType>> ret;
+    for (auto& res : results) {
+        std::vector<SizeType> ids;
+        for (int j = 0; j < k; j++) {
+            auto vid = res.GetResult(j)->VID;
+            if (m_internalToExternal.find(vid) != m_internalToExternal.end()) {
+                ids.push_back(m_internalToExternal[vid]);
+            } else {
+                ids.push_back(-1); // Not found
+            }
+        }
+        ret.push_back(ids);
+    }
+    return ret;
+}
+};
 
             // PyBind11 模块定义
             PYBIND11_MODULE(spfresh_py, m) {
