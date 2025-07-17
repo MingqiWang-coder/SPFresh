@@ -29,19 +29,19 @@ def test_spfresh():
     print("3. 构建索引...")
     index.build(vectors, "./spfresh_index", ssd_build_threads=2, normalize=True)
     print("   构建完成")
-
+    # 5. 测试插入
+    print("5. 测试插入...")
+    new_vectors = np.random.randn(10000, dimension).astype(np.float32)
+    new_ids = list(range(100000, 110000))
+    index.insert(new_vectors, new_ids, 1)
+    print("   插入完成")
     # 4. 测试搜索
     print("4. 测试搜索...")
     query = np.random.randn(10, dimension).astype(np.float32)
     results = index.search(query, 10, 1)
     print(f"   搜索结果: {results}")
 
-    # 5. 测试插入
-    print("5. 测试插入...")
-    new_vectors = np.random.randn(10000, dimension).astype(np.float32)
-    new_ids = list(range(100000, 110000))
-    index.insert(new_vectors, new_ids, 4)
-    print("   插入完成")
+
 
     # # 6. 测试删除
     # print("6. 测试删除...")
